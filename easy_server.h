@@ -70,9 +70,9 @@ public:
 	~EasyServer();
 	//listener add interface
 	/* bool AddTcpListener(int port); */
-	bool AddTcpListener(int port,TcpPacketHandleCb& tphcb);
+	bool AddTcpListener(/* int port, */TcpPacketHandleCb& tphcb);
 	/* bool AddUdpListener(int port); */
-	bool AddUdpListener(int port,UdpPacketHandleCb& uphcb);
+	bool AddUdpListener(/* int port, */UdpPacketHandleCb& uphcb);
 	bool AddOvertimeListener(int tm,overtime_cb cb,void * arg);
 
 	//create selfdefined tcp connection object

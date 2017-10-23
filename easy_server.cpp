@@ -73,10 +73,11 @@ EasyServer::~EasyServer()
 //     return true;
 // }
 
-bool EasyServer::AddTcpListener(int port,TcpPacketHandleCb& tphcb)
+bool EasyServer::AddTcpListener(// int port,
+                                TcpPacketHandleCb& tphcb)
 {
     TcpListener tl;
-    if(!StartTcpListen(tl,port)){
+    if(!StartTcpListen(tl,tphcb.port)){
         return false;
     }
 
@@ -97,10 +98,11 @@ bool EasyServer::AddTcpListener(int port,TcpPacketHandleCb& tphcb)
 //     return true;
 // }
 
-bool EasyServer::AddUdpListener(int port,UdpPacketHandleCb& udpcb)
+bool EasyServer::AddUdpListener(// int port,
+                                UdpPacketHandleCb& udpcb)
 {
     UdpListener ul;
-    if(!StartUdpListen(ul,port))
+    if(!StartUdpListen(ul,udpcb.port))
     {
         return false;
     }
@@ -622,7 +624,7 @@ extern void ReleaseCapture(TcpConnItem * tci);
 bool EasyServer::AddMonitorListener(int port,tcppackethandle_cb tcpcb)
 {
     TcpPacketHandleCb cb(tcpcb,port,false,true,NULL,-1,NULL,ReleaseCapture,NULL);
-    if(!AddTcpListener(port,cb)){
+    if(!AddTcpListener(cb)){
         return false;
     }
 
