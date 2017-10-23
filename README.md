@@ -9,6 +9,7 @@ libeasyserver.so ,one for static lib and the other for dynamic. Then use ./make 
 
 2. run the example
 
-After you install the libs,you can run the command below to compile the example,you also need to install libevent 2.0.22 and boost library;
+After you install the libs,you also need to install libevent 2.0.22 and boost library,then you can run the command below to compile the example
+
 g++  -std=c++11 -w main.cpp -levent -leasyserver -lboost_thread -lboost_system
 
