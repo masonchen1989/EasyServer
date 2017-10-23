@@ -18,7 +18,7 @@ g++  -std=c++11 -w main.cpp -levent -leasyserver -lboost_thread -lboost_system
 
 3.1 tcp listener
 
-For building a tcp listener,you need frist create a TcpPacketHandleCb instance ,
+For building a tcp listener,you need create a TcpPacketHandleCb instance ,
 
 
 	TcpPacketHandleCb(tcppackethandle_cb hc,int p,bool tph=false,bool ar=true,tcppacketlen_cb lcb=NULL,int l=-1,tcppacketsendresult_cb rcb=NULL,tcpconnclose_cb ccb=NULL,tcppacketsendresult_cb2 rcb2=NULL){
@@ -32,4 +32,18 @@ For building a tcp listener,you need frist create a TcpPacketHandleCb instance ,
 		closecb=ccb;                //a callback that will be invoked when the tcp connection ends 
 		resultcb2=rcb2;             //not used for now
 	}
+
+
+3.2 udp listener
+
+For building a udp listener,you need create a UdpPacketHandleCb instance ,
+
+	UdpPacketHandleCb(udppackethandle_cb c,int p,bool acf=true/* ,bool cap=true */){
+		cb=c;         //a callback that will handle udp packet
+		port=p;       //listening port for udp listener
+		autoclosefd=acf;  //the buffer that hoding the udp packet released by framework or by hand
+		/* captured=cap; */
+	}
+
+
 
