@@ -160,26 +160,39 @@ void WorkerThread::HandleTcpConn(WorkerThread* pwt)
 
         //allocate buffer for socket
         bev=bufferevent_socket_new(pwt->pthread_event_base_,sp.sock,BEV_OPT_CLOSE_ON_FREE);
-        if(bev==NULL)
+        if(bev==NULL){
+            LOG(WARNING)<<"bufferevent_socket_new failed! close the tcp socket !";
+            close(sp.sock);
             break;
+        }
 
-        std::shared_ptr<TcpConnItem> ptci(pwt->es_->factory_->CreateTcpConn(sp.sock,sp.port,pwt->threadindex_,sessionid));
+        std::string ip;
+        if(sp.ipaddr){
+            char iptmp[100]={0};
+            ip=inet_ntop(AF_INET,&((sockaddr_in *)(sp.ipaddr))->sin_addr,iptmp,100);
+            nedalloc::nedfree(sp.ipaddr);
+        }
 
-        if(!ptci)
+        std::shared_ptr<TcpConnItem> ptci(pwt->es_->factory_->CreateTcpConn(sp.sock,sp.port,pwt->threadindex_,sessionid,ip));
+
+        if(!ptci){
+            LOG(WARNING)<<"CreateTcpConn failed!";
             break;
+        }
+
         ptci->buff=bev;
 
         pwt->InsertTcpConnItem(ptci);
 
         bufferevent_setcb(bev, TcpConnReadCb, NULL/*ConnWriteCb*/, TcpConnEventCB,ptci.get());
         bufferevent_enable(bev, EV_READ /*| EV_WRITE*/ );
-        LOG(DEBUG)<<"got an tcp connection and session id is "<<ptci->sessionid;
+        // LOG(DEBUG)<<"got an tcp connection and session id is "<<ptci->sessionid;
         return;
 
     }while(0);
 
     //error occurred
-    LOG(WARNING)<<"something wrong happened about the tcp connection";
+
     if(bev)
         bufferevent_free(bev);
 
@@ -345,7 +358,7 @@ void WorkerThread::TcpConnEventCB(bufferevent *bev,short int  events,void * ctx)
     //TODO
 
     TcpConnItem * ptci=static_cast<TcpConnItem *>(ctx);
-    LOG(DEBUG)<<"tcp conn got an event "<<ptci->sessionid;
+    // LOG(DEBUG)<<"tcp conn got an event "<<ptci->sessionid;
     // tcpconnclose_cb closecb=thread->es_->GetTcpConnClose_cb();
     if(ptci->handlefunindex!=-1){
         tcpconnclose_cb closecb=thread->es_->vec_tcppackethandlecbs_[ptci->handlefunindex].closecb;
@@ -431,7 +444,7 @@ void WorkerThread::KillTcpConnection(const std::string& sessionid)
 
         // bufferevent_free(ptr->second->buff);
         DeleteTcpConnItem(sessionid);
-        LOG(DEBUG)<<"Tcp connection "<<sessionid<<" killed";
+        // LOG(DEBUG)<<"Tcp connection "<<sessionid<<" killed";
     }
 }
 

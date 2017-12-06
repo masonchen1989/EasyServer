@@ -45,7 +45,7 @@ public:
 	void InsertTcpConnItem(std::shared_ptr<TcpConnItem> ptci){
 		std::lock_guard<std::recursive_mutex>  lock(mutex_un_map_tcp_conns_);
 		auto pos=un_map_tcp_conns_.insert(std::make_pair(ptci->sessionid,ptci));
-		if(!pos.second){
+		if((pos.first!=un_map_tcp_conns_.end())&&(!pos.second)){
 			pos.first->second=ptci;
 		}
 	}

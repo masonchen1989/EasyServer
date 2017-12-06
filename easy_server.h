@@ -23,6 +23,8 @@ class EasyServer;
 struct TcpPacketHandleCb;
 struct UdpPacketHandleCb;
 
+extern char * ConvertBytes2HexString(const unsigned char * bytes,int len,char * hexstr,int);
+
 typedef void (*overtime_cb)(evutil_socket_t fd, short what,void * arg);
 typedef unsigned int (*tcppacketlen_cb)(unsigned char * data,int len);
 /* typedef void (*tcppackethandle_cb)(EasyServer * server,int threadindex,const std::string& sessionid,unsigned char * data,int len,bool runinthreadpool); */
@@ -57,8 +59,8 @@ struct OvertimeListener
 
 class TcpConnFactory{
 public:
-	virtual TcpConnItem * CreateTcpConn(int s,int p,int i,const std::string& sid){
-		TcpConnItem * ret=new TcpConnItem(s,p,i,sid);
+	virtual TcpConnItem * CreateTcpConn(int s,int p,int i,const std::string& sid,const std::string& ip){
+		TcpConnItem * ret=new TcpConnItem(s,p,i,sid,ip);
 		return ret;
 	}
 };
@@ -70,9 +72,9 @@ public:
 	~EasyServer();
 	//listener add interface
 	/* bool AddTcpListener(int port); */
-	bool AddTcpListener(/* int port, */TcpPacketHandleCb& tphcb);
+	bool AddTcpListener(int port,TcpPacketHandleCb& tphcb);
 	/* bool AddUdpListener(int port); */
-	bool AddUdpListener(/* int port, */UdpPacketHandleCb& uphcb);
+	bool AddUdpListener(int port,UdpPacketHandleCb& uphcb);
 	bool AddOvertimeListener(int tm,overtime_cb cb,void * arg);
 
 	//create selfdefined tcp connection object
@@ -130,8 +132,6 @@ public:
 		nedalloc::nedfree(data);
 		LOG(DEBUG)<<"Freed "<<len<<" bytes data by hand";
 	}
-
-	static std::string ConvertBytes2HexString(const unsigned char * bytes,int len);
 
 	//used inside,never mind!!!
 	/* Tcp 处理 */

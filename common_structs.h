@@ -15,6 +15,7 @@ class WorkerThread;
 struct SocketPort{
         int sock;
         int port;
+        void * ipaddr;
 };
 
 
@@ -57,7 +58,7 @@ SessionKill(const std::string& sid)
 };
 
 struct TcpConnItem{
-        TcpConnItem(int s,int p,int i,const std::string& sid)
+    TcpConnItem(int s,int p,int i,const std::string& sid,const std::string& ipaddr)
                 {
                         sock=s;
                         port=p;
@@ -70,6 +71,8 @@ struct TcpConnItem{
                         sessionid=sid;
                         /* isfirstpacket=true; */
                         handlefunindex=-1;
+                        ip=ipaddr;
+                        LOG(DEBUG)<<"tcp connection "<<sessionid<<" created! from ip "<<ip;
                 }
 
         virtual ~TcpConnItem()
@@ -77,6 +80,7 @@ struct TcpConnItem{
                     FreeData();
                     if(buff)
                         bufferevent_free(buff);
+                    LOG(DEBUG)<<"tcp connection "<<sessionid<<" closed!";
                 }
 
         bool AllocateCopyData( struct evbuffer * in,size_t * buffer_len,unsigned short length=0)//allocate need length
@@ -130,5 +134,6 @@ struct TcpConnItem{
         int handlefunindex;
         /* bool isfirstpacket; */
         std::string sessionid;
+        std::string ip;
 };
 #endif

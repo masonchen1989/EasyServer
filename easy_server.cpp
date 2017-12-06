@@ -11,17 +11,7 @@
 thread_local int thread_local_port=-1;
 thread_local bool isworkerthread=false;
 
-static char ConvertNumToHexChar2(unsigned char num)
-{
-    char ret=-1;
-    if(num>=0&&num<=9)
-        ret=num+'0';
-    else if(num>=10&&num<=15){
-        ret=num+'A'-10;
-    }
 
-    return ret;
-}
 
 EasyServer::EasyServer(int num_of_workers, int num_of_threads_in_threadpool)
 {
@@ -73,11 +63,10 @@ EasyServer::~EasyServer()
 //     return true;
 // }
 
-bool EasyServer::AddTcpListener(// int port,
-                                TcpPacketHandleCb& tphcb)
+bool EasyServer::AddTcpListener(int port,TcpPacketHandleCb& tphcb)
 {
     TcpListener tl;
-    if(!StartTcpListen(tl,tphcb.port)){
+    if(!StartTcpListen(tl,port)){
         return false;
     }
 
@@ -98,11 +87,10 @@ bool EasyServer::AddTcpListener(// int port,
 //     return true;
 // }
 
-bool EasyServer::AddUdpListener(// int port,
-                                UdpPacketHandleCb& udpcb)
+bool EasyServer::AddUdpListener(int port,UdpPacketHandleCb& udpcb)
 {
     UdpListener ul;
-    if(!StartUdpListen(ul,udpcb.port))
+    if(!StartUdpListen(ul,port))
     {
         return false;
     }
@@ -146,11 +134,11 @@ bool EasyServer::StartTcpListen(TcpListener& tl,int port)
 
         try{
             listen_thread.reset(new std::thread([this,port,base]
-                                                     {
-                                                         thread_local_port=port;
-                                                         event_base_dispatch(base);
-                                                     }
-                                         ));
+                                                {
+                                                    thread_local_port=port;
+                                                    event_base_dispatch(base);
+                                                }
+                                    ));
         }catch(...){
             break;
         }
@@ -206,11 +194,11 @@ bool EasyServer::StartUdpListen(UdpListener& ul,int port)
 
         try{
             listen_thread.reset(new std::thread([this,port,base]
-                                                     {
-                                                         thread_local_port=port;
-                                                         event_base_dispatch(base);
-                                                     }
-                                         ));
+                                                {
+                                                    thread_local_port=port;
+                                                    event_base_dispatch(base);
+                                                }
+                                    ));
         }catch(...){
             break;
         }
@@ -252,10 +240,10 @@ bool EasyServer::StartOvertimeListen(OvertimeListener& ol,int timespan,overtime_
             if(event_add(listen_event,&tv)==-1)
                 break;
             listen_thread.reset(new std::thread([this,base]
-                                                         {
-                                                             event_base_dispatch(base);
-                                                         }
-                                             ));
+                                                {
+                                                    event_base_dispatch(base);
+                                                }
+                                    ));
         }
         catch(...){
             break;
@@ -334,16 +322,6 @@ bool EasyServer::CreateAllWorkerThreads()
     return ret;
 }
 
-std::string EasyServer::ConvertBytes2HexString(const unsigned char * bytes,int len)
-{
-    char hexstr[10000]={0};
-    for(int i=0;i<len;++i){
-        hexstr[2*i]=ConvertNumToHexChar2(bytes[i]>>4);
-        hexstr[2*i+1]=ConvertNumToHexChar2(bytes[i]&0x0f);
-    }
-    hexstr[2*len]='\0';
-    return std::string(hexstr);
-}
 
 void EasyServer::AcceptTcpError(evconnlistener *listener, void *ptr)
 {
@@ -353,13 +331,20 @@ void EasyServer::AcceptTcpError(evconnlistener *listener, void *ptr)
 
 void EasyServer::AcceptTcpConn(evconnlistener * listener, int sock, sockaddr * addr, int len, void *ptr)
 {
-  LOG(DEBUG)<<"Accept tcp connection";
-  EasyServer * es=static_cast<EasyServer *>(ptr);
-  int cur_thread_index=es->GetIndexOfIdleWorker();
-  SocketPort sp{sock,thread_local_port};
+    void * ipaddr=nedalloc::nedmalloc(len);
+    if(ipaddr){
+        memcpy(ipaddr,addr,len);
+    }
 
-  if(!es->GetWorkerByIndex(cur_thread_index)->PushTcpConnIntoQueueAndSendNotify(sp))
-      LOG(WARNING)<<"tcp notify worker failed";
+    EasyServer * es=static_cast<EasyServer *>(ptr);
+    int cur_thread_index=es->GetIndexOfIdleWorker();
+    SocketPort sp{sock,thread_local_port,ipaddr};
+
+    if(!es->GetWorkerByIndex(cur_thread_index)->PushTcpConnIntoQueueAndSendNotify(sp)){
+        LOG(WARNING)<<"tcp notify worker failed,close the tcp socket!";
+        close(sock);
+    }
+
 }
 
 void EasyServer::AcceptUdpConn(evutil_socket_t fd, short what, void * arg){
@@ -373,57 +358,57 @@ void EasyServer::AcceptUdpConn(evutil_socket_t fd, short what, void * arg){
 
     do{
         addr=(struct sockaddr_in *)nedalloc::nedcalloc(addr_len,1);
-    if(!addr)
-    {
-        LOG(WARNING)<<"nedalloc::nedcalloc failed for udp addr";
-        break;
-    }
-    else{
-        LOG(DEBUG)<<"Allocated "<<addr_len<<" bytes data for udp addr ";
-    }
+        if(!addr)
+        {
+            LOG(WARNING)<<"nedalloc::nedcalloc failed for udp addr";
+            break;
+        }
+        else{
+            LOG(DEBUG)<<"Allocated "<<addr_len<<" bytes data for udp addr ";
+        }
 
-    char buf[65535]={0};
+        char buf[65535]={0};
 
-    if((datalen=recvfrom(fd,buf,65535,0,(struct sockaddr *)addr,&addr_len))<=0){
-        LOG(WARNING)<<"read data from udp failed";
-        break;
-    }
+        if((datalen=recvfrom(fd,buf,65535,0,(struct sockaddr *)addr,&addr_len))<=0){
+            LOG(WARNING)<<"read data from udp failed";
+            break;
+        }
 
-    data=nedalloc::nedmalloc(datalen);
-    if(!data)
-    {
-        LOG(WARNING)<<"nedalloc::nedmalloc failed for udp packet";
-        break;
-    }
-    else{
-        LOG(DEBUG)<<"Allocated "<<datalen<<" bytes data for udp packet ";
-    }
+        data=nedalloc::nedmalloc(datalen);
+        if(!data)
+        {
+            LOG(WARNING)<<"nedalloc::nedmalloc failed for udp packet";
+            break;
+        }
+        else{
+            LOG(DEBUG)<<"Allocated "<<datalen<<" bytes data for udp packet ";
+        }
 
-    memcpy(data,buf,datalen);
+        memcpy(data,buf,datalen);
 
-    dupfd=dup(fd);
-    if(dupfd==-1){
-        LOG(WARNING)<<"dup udp fd failed";
-        break;
-    }
-    else{
-        LOG(DEBUG)<<"dup udp fd success!"<<dupfd;
-    }
+        dupfd=dup(fd);
+        if(dupfd==-1){
+            LOG(WARNING)<<"dup udp fd failed";
+            break;
+        }
+        else{
+            LOG(DEBUG)<<"dup udp fd success!"<<dupfd;
+        }
 
-    bool packethandled=false;
-    for(auto pos=es->vec_udppackethandlecbs_.begin();pos!=es->vec_udppackethandlecbs_.end();++pos){
-        if(pos->port==thread_local_port){
-            if(pos->cb){
-                es->thread_pool_->enqueue(*pos,es,(unsigned char *)data,(int)datalen,(void *)addr,(int)addr_len,dupfd);
-                packethandled=true;
+        bool packethandled=false;
+        for(auto pos=es->vec_udppackethandlecbs_.begin();pos!=es->vec_udppackethandlecbs_.end();++pos){
+            if(pos->port==thread_local_port){
+                if(pos->cb){
+                    es->thread_pool_->enqueue(*pos,es,(unsigned char *)data,(int)datalen,(void *)addr,(int)addr_len,dupfd);
+                    packethandled=true;
+                }
             }
         }
-    }
 
-    if(!packethandled)
-        LOG(WARNING)<<"packet can't get handle cb for port "<<thread_local_port;
+        if(!packethandled)
+            LOG(WARNING)<<"packet can't get handle cb for port "<<thread_local_port;
 
-    return;
+        return;
     }while(0);
 
     //error occurs
@@ -450,8 +435,8 @@ void EasyServer::SendDataToTcpConnection(int threadindex,const std::string& sess
         return;
     std::shared_ptr<WorkerThread> worker=vec_workers_[threadindex];
     if(worker){
-        // char tmp[1000]={0};
-        std::string hexstr=ConvertBytes2HexString((const unsigned char *)data,len);
+        char tmp[1000]={0};
+        const char * hexstr=ConvertBytes2HexString((const unsigned char *)data,len,tmp,1000);
         // LOG(DEBUG)<<hexstr;
 
         if(!isworkerthread){//in thread pool
@@ -480,6 +465,8 @@ void EasyServer::SendDataToTcpConnection(int threadindex,const std::string& sess
         return;
     std::shared_ptr<WorkerThread> worker=vec_workers_[threadindex];
     if(worker){
+        char tmp[1000]={0};
+        const char * hexstr=ConvertBytes2HexString((const unsigned char *)strdata.c_str(),strdata.length(),tmp,1000);
         if(!isworkerthread){//in thread pool
             SessionData sd(sessionid,strdata,strarg);
             sd.hasResultCb=hasResultCb;
@@ -488,11 +475,11 @@ void EasyServer::SendDataToTcpConnection(int threadindex,const std::string& sess
                 LOG(WARNING)<<"PushDataIntoQueueAndSendNotify failed";
             }
             else{
-                LOG(DEBUG)<<"send data back to tcp connection from threadpool";
+                LOG(DEBUG)<<"send data back to tcp connection from threadpool "<<hexstr;
             }
         }
         else{//send directly
-            LOG(DEBUG)<<"send data back to tcp connection from worker";
+            LOG(DEBUG)<<"send data back to tcp connection from worker "<<hexstr;
             worker->SendDataToTcpConnection(sessionid,strdata,strarg,hasResultCb);
         }
     }
@@ -624,7 +611,7 @@ extern void ReleaseCapture(TcpConnItem * tci);
 bool EasyServer::AddMonitorListener(int port,tcppackethandle_cb tcpcb)
 {
     TcpPacketHandleCb cb(tcpcb,port,false,true,NULL,-1,NULL,ReleaseCapture,NULL);
-    if(!AddTcpListener(cb)){
+    if(!AddTcpListener(port,cb)){
         return false;
     }
 
